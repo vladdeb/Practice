@@ -339,12 +339,24 @@ procedure addTalon(const Head: TTalonListPt; Talon: TTalon);
 var
   temp: TTalonListPt;
 begin
-  temp := head.next;
+  temp := head^.next;
   while temp^.next <> nil do
     temp := temp^.next;
   New(temp^.next);
   temp^.next := nil;
-  temp.Talon := Talon;
+  temp^.Talon := Talon;
+end;
+
+procedure addDoc(const Head: TDocListPt; Doc: TDoc);
+var
+  temp: TDocListPt;
+begin
+  temp := head^.next;
+  while temp^.next <> nil do
+    temp := temp^.next;
+  New(temp^.next);
+  temp^.next := nil;
+  temp^.Doc := Doc;
 end;
 
 procedure MainMenu;
@@ -512,6 +524,7 @@ var
   cabNum: Integer;
   Name: String;
   ErrorCode: Integer;
+  Talon: TTalon;
   
 begin
   chooseListMenu;
@@ -527,10 +540,16 @@ begin
     InputMenu(999, cabNum);
     write('Введите код врача: ');
     InputMenu(999, docKey);
-    makeTalon(TalonList, DocList, Date, Time, Name, cabNum, docKey, ErrorCode);
-    if errorcode = 1 then
-    begin
-    
+    Talon := makeTalon(TalonList, DocList, Date, Time, Name, cabNum, docKey, ErrorCode);
+    case errorcode of
+    1:   
+      writeln('Такого врача в=не существует');
+    2:
+      writeln('в это время врач не работает');
+    3:
+      writeln('Талон к этому врачу на данное время уже выдан');
+    0:
+      AddTalon(TalonList, Talon);
     end;
   end;
   end;
