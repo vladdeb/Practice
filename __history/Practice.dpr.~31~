@@ -508,10 +508,9 @@ var
   chose: integer;
   Date: TDate;
   Time: TTime;
-  docKey: Integer;
+  docCode: Integer;
   cabNum: Integer;
   Name: String;
-  ErrorCode: Integer;
   
 begin
   chooseListMenu;
@@ -523,15 +522,6 @@ begin
     InputTime('Введите время(формат HH:MM): ', 'Некорректный ввод', Time);
     write('Введите ФИО пациента: ');
     readln(Name);
-    write('Введите номер кабинета: ');
-    InputMenu(999, cabNum);
-    write('Введите код врача: ');
-    InputMenu(999, docKey);
-    makeTalon(TalonList, DocList, Date, Time, Name, cabNum, docKey, ErrorCode);
-    if errorcode = 1 then
-    begin
-    
-    end;
   end;
   end;
 end;

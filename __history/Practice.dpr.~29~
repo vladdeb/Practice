@@ -203,7 +203,6 @@ var
 begin
   if Head^.next = nil then
     writeln('Список пуст');
-  printDoc(temp^.Doc);
   temp := head.next;
   while temp <> nil do
   begin
@@ -370,7 +369,7 @@ begin
   writeln('[3] - В главное меню.');
 end;
 
-procedure TalonFields;
+procedure TalonListFields;
 begin
   writeln('[1] - Дата.');
   writeln('[2] - Время.');
@@ -415,7 +414,7 @@ begin
   case chose of
   1:
   begin
-    TalonFields;
+    TalonListFields;
     InputMenu(6, chose);
     case chose of
     1:
@@ -503,39 +502,6 @@ begin
     end;
 end;
 
-procedure AddList(TalonList: TTalonListPt; DocList: TDocListPt);
-var
-  chose: integer;
-  Date: TDate;
-  Time: TTime;
-  docKey: Integer;
-  cabNum: Integer;
-  Name: String;
-  ErrorCode: Integer;
-  
-begin
-  chooseListMenu;
-  InputMenu(3, chose);
-  case chose of
-  1:
-  begin  
-    InputDate('Введите дату(формат DD.MM.YYYY): ', 'Некорректный ввод', Date);
-    InputTime('Введите время(формат HH:MM): ', 'Некорректный ввод', Time);
-    write('Введите ФИО пациента: ');
-    readln(Name);
-    write('Введите номер кабинета: ');
-    InputMenu(999, cabNum);
-    write('Введите код врача: ');
-    InputMenu(999, docKey);
-    makeTalon(TalonList, DocList, Date, Time, Name, cabNum, docKey, ErrorCode);
-    if errorcode = 1 then
-    begin
-    
-    end;
-  end;
-  end;
-end;
-
 var
   TalonList: TTalonListPt;
   DocList: TDocListPt;
@@ -561,8 +527,6 @@ begin
       continue;
     4:
       SearchList(TalonList, DocList);
-    5:
-      AddList(TalonList, DocList);
     end;
   end;
   readln;

@@ -7,7 +7,8 @@ program Practice;
 uses
   System.SysUtils;
 
-type
+type   
+  TMenu = (mnMain, mnList, mnTalonField, mnDocField);
   TWeekDay = (Mon, Tue, Wed, Thu, Fri, Sat, Sun);
   TWorkDay = Mon..Sat;
   TWorkHours = record
@@ -160,21 +161,36 @@ begin
   Time := StrToTime(temp);
 end;
 
+procedure printTalon(temp: TTalon);
+begin
+  writeln('Дата: ', DateToStr(temp.date));
+  writeln('Время: ', TimeToStr(temp.time));
+  writeln('№ в очереди: ', temp.queuePos);
+  writeln('ФИО пациента: ', temp.patientLastName);
+  writeln('Кабинет: ', temp.cabNum);
+  writeln('Код врача: ', temp.docKey);
+end;
+
+procedure printDoc(temp: TDoc);
+begin
+  writeln('Код: ', temp.docKey);
+  writeln('Специализация: ', temp.specialisation);
+  writeln('ФИО врача: ', temp.docLastName);
+  writeln('График работы:');
+  for var i := Mon to Sat do
+    writeln('  ', WeekNames[i], ': ', TimeToStr(temp.Schedule[i].start), '-', TimeToStr(temp.Schedule[i].finish));
+end;
+
 procedure printTalonList(const Head: TTalonListPt);
 var
   temp: TTalonListPt;
 begin
   if Head^.next = nil then
     writeln('Список пуст');
-  temp := head;
+  temp := head.next;
   while temp <> nil do
   begin
-    writeln('Дата: ', DateToStr(temp^.Talon.date));
-    writeln('Время: ', TimeToStr(temp^.Talon.time));
-    writeln('№ в очереди: ', temp^.Talon.queuePos);
-    writeln('ФИО пациента: ', temp^.Talon.patientLastName);
-    writeln('Кабинет: ', temp^.Talon.cabNum);
-    writeln('Код врача: ', temp^.Talon.docKey);
+    printTalon(temp^.Talon);
     writeln;
     temp := temp^.next;
   end;
@@ -187,15 +203,11 @@ var
 begin
   if Head^.next = nil then
     writeln('Список пуст');
-  temp := head;
+  printDoc(temp^.Doc);
+  temp := head.next;
   while temp <> nil do
   begin
-    writeln('Код: ', temp^.Doc.docKey);
-    writeln('Специализация: ', temp^.Doc.specialisation);
-    writeln('ФИО врача: ', temp^.Doc.docLastName);
-    writeln('График работы:');
-    for i := Mon to Sat do
-      writeln('  ', WeekNames[i], ': ', TimeToStr(temp^.Doc.Schedule[i].start), '-', TimeToStr(temp^.Doc.Schedule[i].finish));
+    
     temp := temp^.next;
   end;
 end;
@@ -208,6 +220,11 @@ end;
 function searchCompTalonTime(temp: TTalonListPt; const Value): boolean;
 begin
   result := temp^.Talon.time = TTime(Value);  
+end;
+
+function searchCompTalonQueue(temp: TTalonListPt; const Value): boolean;
+begin
+  result := temp^.Talon.queuePos = Integer(Value);  
 end;
 
 function searchCompTalonPatientLastName(temp: TTalonListPt; const Value): boolean;
@@ -230,7 +247,7 @@ var
   temp: TTalonListPt;
 begin
   SetLength(result, 0);
-  temp := head;
+  temp := head.next;
   while temp <> nil do
   begin
     if comp(temp, Value) then
@@ -262,7 +279,7 @@ var
   temp: TDocListPt;
 begin
   SetLength(result, 0);
-  temp := head;
+  temp := head.next;
   while temp <> nil do
   begin
     if comp(temp, Value) then
@@ -322,7 +339,7 @@ procedure addTalon(const Head: TTalonListPt; Talon: TTalon);
 var
   temp: TTalonListPt;
 begin
-  temp := head;
+  temp := head.next;
   while temp^.next <> nil do
     temp := temp^.next;
   New(temp^.next);
@@ -347,22 +364,193 @@ end;
 
 procedure chooseListMenu;
 begin
+  writeln('Выберите список');
   writeln('[1] - Список талонов.');
   writeln('[2] - Список врачей.');
   writeln('[3] - В главное меню.');
+end;
+
+procedure TalonFields;
+begin
+  writeln('[1] - Дата.');
+  writeln('[2] - Время.');
+  writeln('[3] - Позиця в очереди.');
+  writeln('[4] - ФИО пациента.');
+  writeln('[5] - номер кабинета.');
+  writeln('[6] - Код врача.');
+end;
+
+procedure DocFields;
+begin
+  writeln('[1] - Код врача.');
+  writeln('[2] - специализация.');
+  writeln('[3] - ФИО врача.'); 
+end;
+
+procedure LookList(TalonList: TTalonListPt; DocList: TDocListPt);
+var
+  chose: integer;
+begin
+  chooseListMenu;
+  InputMenu(3, chose);
+  case chose of
+  1:
+    printTalonList(TalonList);
+  2:
+    printDocList(DocList);  
+  end;
+end;
+
+procedure searchList(TalonList: TTalonListPt; DocList: TDocListPt);
+var
+  chose: integer;
+  Date: TDate;
+  Time: TTime;
+  TalonArr: TTalonArr;
+  DocArr: TDocArr;
+  temp: String;
+begin
+  chooseListMenu;
+  InputMenu(3, chose);
+  case chose of
+  1:
+  begin
+    TalonFields;
+    InputMenu(6, chose);
+    case chose of
+    1:
+    begin
+      InputDate('Введите дату(формат DD.MM.YYYY): ', 'Некорректная дата', Date);
+      TalonArr := searchTalon(TalonList, searchCompTalonDate, Date);
+    end;
+    2:
+    begin
+      InputTime('Введите время(формат HH:MM): ', 'Некорректное время', Time);
+      TalonArr := searchTalon(TalonList, searchCompTalonDate, Time);
+    end;
+    3:
+    begin
+      writeln('Введите позицию в очереди: ');
+      InputMenu(999, chose);
+      TalonArr := searchTalon(TalonList, searchCompTalonQueue, chose);
+    end;
+    4:
+    begin
+      writeln('Введите ФИО пациента: ');
+      readln(temp);
+      TalonArr := searchTalon(TalonList, searchCompTalonPatientLastName, temp);
+    end;
+    5:
+    begin
+      writeln('Введите номер кабинета: ');
+      InputMenu(999, chose);
+      TalonArr := searchTalon(TalonList, searchCompTalonCabNum, chose);
+    end;
+    6:
+    begin
+      writeln('Введите код врача: ');
+      InputMenu(999, chose);
+      TalonArr := searchTalon(TalonList, searchCompTalonCabNum, chose);
+    end;
+    end;
+    if length(TalonArr) = 0 then
+      writeln('Записи не найдены')
+    else
+    begin
+      for var i := Low(TalonArr) to High(TalonArr) do
+      begin
+        printTalon(TalonArr[i]^.Talon);
+        writeln;
+      end;
+    end;
+  end;
+  2:
+  begin
+    DocFields;
+    InputMenu(3, chose);
+    case chose of
+    1:
+    begin
+      writeln('Введите код врача: ');
+      InputMenu(999, chose);
+      DocArr := searchDoc(DocList, searchCompDocKey, chose);
+    end;
+    2:
+    begin
+      writeln('Введите специализацию врача: ');
+      readln(temp);
+      DocArr := searchDoc(DocList, searchCompDocSpecialisation, temp);
+    end;
+    3:
+    begin
+      writeln('Введите ФИО: ');
+      readln(temp);
+      DocArr := searchDoc(DocList, searchCompDocName, temp);
+    end;
+    end;
+    
+  end;
+  end;
+  if length(DocArr) = 0 then
+    writeln('Записи не найдены')
+    else
+    begin
+      for var i := Low(DocArr) to High(DocArr) do
+      begin
+        printDoc(DocArr[i]^.Doc);
+        writeln;
+      end;
+    end;
+end;
+
+procedure AddList(TalonList: TTalonListPt; DocList: TDocListPt);
+var
+  chose: integer;
+  Date: TDate;
+  Time: TTime;
+  docCode: Integer;
+  cabNum: Integer;
+  Name: String;
+  
+begin
+  chooseListMenu;
+  InputMenu(3, chose);
+  case chose of
+  1:
+  begin  
+    writeln('Введите');   
+  end;
+  end;
 end;
 
 var
   TalonList: TTalonListPt;
   DocList: TDocListPt;
   isOn: boolean;
+  temp: integer;
 
 begin
+  New(TalonList);
+  TalonList^.next := nil;
+  New(DocList);          
+  DocList^.next := nil;
   isOn := true;
   while isOn do
   begin
     MainMenu;
-    
+    InputMenu(10, temp);
+    case temp of
+    1:
+      continue;
+    2:
+      LookList(TalonList, DocList);
+    3:
+      continue;
+    4:
+      SearchList(TalonList, DocList);
+    5:
+      AddList(TalonList, DocList);
+    end;
   end;
   readln;
 end.
