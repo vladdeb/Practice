@@ -7,10 +7,8 @@ program Practice;
 uses
   System.SysUtils;
 
-type   
-  TMenu = (mnMain, mnList, mnTalonField, mnDocField);
-  TWeekDay = (Mon, Tue, Wed, Thu, Fri, Sat, Sun);
-  TWorkDay = Mon..Sat;
+type
+  TWeekDay = (Mon, Tue, Wed, Thu, Fri, Sat);
   TWorkHours = record
     start: TTime;
     finish: TTime;
@@ -41,12 +39,10 @@ type
     next: TDocListPt;
   end;
   TTalonSearchComp = function(temp: TTalonListPt; const Value): boolean; 
-  TDocSearchComp = function(temp: TDocListPt; const Value): boolean; 
-  TTalonArr = array of TTalonListPt;                                 
-  TDocArr = array of TDocListPt;
+  TTalonArr = array of TTalonListPt;
 
 const
-  WeekNames: array[TWeekDay] of String = ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday');
+  WeekNames: array[TWeekDay] of String = ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday');
   MonthDays: array[1..12] of integer = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
 
 function isDigit(c: char): boolean;
@@ -105,28 +101,6 @@ begin
   end;
 end;
 
-procedure InputMenu(const n: Integer; var Chose: integer);
-var
-  flag: boolean;
-  temp: string;
-  code: Integer;
-begin
-  flag := false;
-  repeat
-    readln(temp);
-    Val(temp, chose, code);
-    if code <> 0 then
-      writeln('Введите число')
-    else
-    begin
-      if (chose < 1) or (chose > n) then
-        writeln('Введите число от 1 до ', n)
-      else
-        flag := true;
-    end;
-  until flag;
-end;
-
 procedure InputDate(AMessage, AWrongMessage: String; var Date: TDate);
 var
   flag: boolean;
@@ -167,7 +141,7 @@ var
 begin
   if Head^.next = nil then
     writeln('Список пуст');
-  temp := head.next;
+  temp := head;
   while temp <> nil do
   begin
     writeln('Дата: ', DateToStr(temp^.Talon.date));
@@ -188,7 +162,7 @@ var
 begin
   if Head^.next = nil then
     writeln('Список пуст');
-  temp := head.next;
+  temp := head;
   while temp <> nil do
   begin
     writeln('Код: ', temp^.Doc.docKey);
@@ -201,27 +175,27 @@ begin
   end;
 end;
 //Компараторы поиска талонов
-function searchCompTalonDate(temp: TTalonListPt; const Value): boolean;
+function searchCompDate(temp: TTalonListPt; const Value): boolean;
 begin
   result := temp^.Talon.date = TDate(Value);
 end;
 
-function searchCompTalonTime(temp: TTalonListPt; const Value): boolean;
+function searchCompTime(temp: TTalonListPt; const Value): boolean;
 begin
   result := temp^.Talon.time = TTime(Value);  
 end;
 
-function searchCompTalonPatientLastName(temp: TTalonListPt; const Value): boolean;
+function searchCompPatientLastName(temp: TTalonListPt; const Value): boolean;
 begin
   result := temp^.Talon.patientLastName = String(Value);  
 end;
 
-function searchCompTalonCabNum(temp: TTalonListPt; const Value): boolean;
+function searchCompCabNum(temp: TTalonListPt; const Value): boolean;
 begin
   result := temp^.Talon.cabNum = Integer(Value);  
 end;
                                        
-function searchCompTalonDocKey(temp: TTalonListPt; const Value): boolean;
+function searchCompDocKey(temp: TTalonListPt; const Value): boolean;
 begin
   result := temp^.Talon.docKey = Integer(Value);  
 end;
@@ -231,7 +205,7 @@ var
   temp: TTalonListPt;
 begin
   SetLength(result, 0);
-  temp := head.next;
+  temp := head;
   while temp <> nil do
   begin
     if comp(temp, Value) then
@@ -240,82 +214,6 @@ begin
       result[High(result)] := temp;
     end;
     temp := temp^.next;
-  end;
-end;
-
-function searchCompDocKey(temp: TDocListPt; const Value): boolean;
-begin
-  result := temp^.Doc.docKey = Integer(Value);
-end;
-
-function searchCompDocSpecialisation(temp: TDocListPt; const Value): boolean;
-begin
-  result := temp^.Doc.specialisation = String(Value);
-end;
-
-function searchCompDocName(temp: TDocListPt; const Value): boolean;
-begin
-  result := temp^.Doc.doclastName = String(Value);
-end;
-
-function SearchDoc(const Head: TDocListPt; const Comp: TDocSearchComp; const Value): TDocArr;
-var
-  temp: TDocListPt;
-begin
-  SetLength(result, 0);
-  temp := head.next;
-  while temp <> nil do
-  begin
-    if comp(temp, Value) then
-    begin
-      SetLength(result, length(result) + 1);
-      result[High(result)] := temp;
-    end;
-    temp := temp^.next;
-  end;
-end;
-
-function MakeTalon(const TalonList: TTalonListPt; const docList: TDocListPt; const Date: TDate; const Time: TTime; const patient: String; const cabNum, docKey: Integer; var ErrorCode: Integer): TTalon;
-var
-  DocArr: TDocArr;
-  TalonArr: TTalonArr;
-  WeekDay: TWeekDay;
-begin
-  errorCode := 0;
-  result.date := Date;
-  result.time := Time;
-  result.patientLastName := patient;
-  result.cabNum := cabNum;
-  result.docKey := docKey;
-  DocArr := searchDoc(docList, searchCompDocKey, docKey);
-  WeekDay := TWeekDay(DayOfWeek(Date) - 1);
-  if length(DocArr) = 0 then
-    errorCode := 1
-  else if (Time < DocArr[0]^.Doc.Schedule[WeekDay].start) or (Time > DocArr[0]^.Doc.Schedule[WeekDay].finish) then
-      errorCode := 2
-  else
-  begin
-    TalonArr := searchTalon(TalonList, searchCompTalonDocKey, docKey);
-    result.queuePos := 1;
-    for var i := Low(TalonArr) to High(TalonArr) do
-    begin
-      if TalonArr[i]^.Talon.date = Date then
-      begin
-        if TalonArr[i]^.Talon.time = Time then
-          errorCode := 3;
-      end;
-    end;
-    if errorCode = 0 then
-      for var i := Low(TalonArr) to High(TalonArr) do
-      begin
-        if TalonArr[i]^.Talon.date = Date then
-        begin
-          if TalonArr[i]^.Talon.time < Time then
-            Inc(result.queuePos);
-          if TalonArr[i]^.Talon.time > Time then
-            Inc(TalonArr[i]^.Talon.queuePos);
-        end;
-      end;
   end;
 end;
 
@@ -323,7 +221,7 @@ procedure addTalon(const Head: TTalonListPt; Talon: TTalon);
 var
   temp: TTalonListPt;
 begin
-  temp := head.next;
+  temp := head;
   while temp^.next <> nil do
     temp := temp^.next;
   New(temp^.next);
@@ -353,43 +251,6 @@ begin
   writeln('[3] - В главное меню.');
 end;
 
-procedure LookList(TalonList: TTalonListPt; DocList: TDocListPt);
-var
-  chose: integer;
 begin
-  chooseListMenu;
-  InputMenu(3, chose);
-  case chose of
-  1:
-    printTalonList(TalonList);
-  2:
-    printDocList(DocList);  
-  end;
-end;
-
-var
-  TalonList: TTalonListPt;
-  DocList: TDocListPt;
-  isOn: boolean;
-  temp: integer;
-
-begin
-  New(TalonList);
-  TalonList^.next := nil;
-  New(DocList);          
-  DocList^.next := nil;
-  isOn := true;
-  while isOn do
-  begin
-    MainMenu;
-    InputMenu(10, temp);
-    case temp of
-    1:
-      continue;
-    2:
-      LookList(TalonList, DocList);
-    3:  
-    end;
-  end;
   readln;
 end.

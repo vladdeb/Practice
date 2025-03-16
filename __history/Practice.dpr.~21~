@@ -7,8 +7,7 @@ program Practice;
 uses
   System.SysUtils;
 
-type   
-  TMenu = (mnMain, mnList, mnTalonField, mnDocField);
+type
   TWeekDay = (Mon, Tue, Wed, Thu, Fri, Sat, Sun);
   TWorkDay = Mon..Sat;
   TWorkHours = record
@@ -105,28 +104,6 @@ begin
   end;
 end;
 
-procedure InputMenu(const n: Integer; var Chose: integer);
-var
-  flag: boolean;
-  temp: string;
-  code: Integer;
-begin
-  flag := false;
-  repeat
-    readln(temp);
-    Val(temp, chose, code);
-    if code <> 0 then
-      writeln('Введите число')
-    else
-    begin
-      if (chose < 1) or (chose > n) then
-        writeln('Введите число от 1 до ', n)
-      else
-        flag := true;
-    end;
-  until flag;
-end;
-
 procedure InputDate(AMessage, AWrongMessage: String; var Date: TDate);
 var
   flag: boolean;
@@ -167,7 +144,7 @@ var
 begin
   if Head^.next = nil then
     writeln('Список пуст');
-  temp := head.next;
+  temp := head;
   while temp <> nil do
   begin
     writeln('Дата: ', DateToStr(temp^.Talon.date));
@@ -188,7 +165,7 @@ var
 begin
   if Head^.next = nil then
     writeln('Список пуст');
-  temp := head.next;
+  temp := head;
   while temp <> nil do
   begin
     writeln('Код: ', temp^.Doc.docKey);
@@ -231,7 +208,7 @@ var
   temp: TTalonListPt;
 begin
   SetLength(result, 0);
-  temp := head.next;
+  temp := head;
   while temp <> nil do
   begin
     if comp(temp, Value) then
@@ -263,7 +240,7 @@ var
   temp: TDocListPt;
 begin
   SetLength(result, 0);
-  temp := head.next;
+  temp := head;
   while temp <> nil do
   begin
     if comp(temp, Value) then
@@ -316,6 +293,7 @@ begin
             Inc(TalonArr[i]^.Talon.queuePos);
         end;
       end;
+      
   end;
 end;
 
@@ -323,7 +301,7 @@ procedure addTalon(const Head: TTalonListPt; Talon: TTalon);
 var
   temp: TTalonListPt;
 begin
-  temp := head.next;
+  temp := head;
   while temp^.next <> nil do
     temp := temp^.next;
   New(temp^.next);
@@ -353,43 +331,6 @@ begin
   writeln('[3] - В главное меню.');
 end;
 
-procedure LookList(TalonList: TTalonListPt; DocList: TDocListPt);
-var
-  chose: integer;
 begin
-  chooseListMenu;
-  InputMenu(3, chose);
-  case chose of
-  1:
-    printTalonList(TalonList);
-  2:
-    printDocList(DocList);  
-  end;
-end;
-
-var
-  TalonList: TTalonListPt;
-  DocList: TDocListPt;
-  isOn: boolean;
-  temp: integer;
-
-begin
-  New(TalonList);
-  TalonList^.next := nil;
-  New(DocList);          
-  DocList^.next := nil;
-  isOn := true;
-  while isOn do
-  begin
-    MainMenu;
-    InputMenu(10, temp);
-    case temp of
-    1:
-      continue;
-    2:
-      LookList(TalonList, DocList);
-    3:  
-    end;
-  end;
   readln;
 end.
