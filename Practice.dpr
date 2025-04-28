@@ -21,7 +21,7 @@ type
     date: Tdate;
     time: TTime;
     queuePos: integer;
-    patientLastName: String;
+    patientLastName: String[255];
     cabNum: Integer;
     docKey: Integer;
   End;
@@ -32,8 +32,9 @@ type
   TDocListPt = ^TDocList;
   TDoc = record
     docKey: Integer;
-    specialisation: String;
-    docLastName: String;
+    specialisation: String[255];
+    docLastName: String[255];
+    cab: integer;
     Schedule: TSchedule;
   end;
   TDocList = record
@@ -44,6 +45,16 @@ type
   TDocSearchComp = function(temp: TDocListPt; const Value): boolean;
   TTalonArr = array of TTalonListPt;
   TDocArr = array of TDocListPt;
+  TTalonFile = file of TTalon;
+  TDocFile = file of TDoc;
+  TDocDate = record
+    code: integer;
+    Date: TDate;
+  end;          
+  TDocNameDate = record
+    name: string;
+    Date: TDate;
+  end;
 
 const
   WeekNames: array[TWeekDay] of String = ('Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье');
@@ -161,6 +172,28 @@ begin
   Time := StrToTime(temp);
 end;
 
+function TalonListSize(head: TTalonListPt): integer;
+begin
+  result := 0;   
+  head := head^.next;
+  while head <> nil do
+  begin
+    Inc(result);
+    head := head^.next;
+  end;
+end;
+
+function DocListSize(head: TDocListPt): integer;
+begin
+  result := 0;
+  head := head^.next;
+  while head <> nil do
+  begin
+    Inc(result);
+    head := head^.next;
+  end;
+end;
+
 procedure printTalon(temp: TTalon);
 begin
   writeln('Дата: ', DateToStr(temp.date));
@@ -176,6 +209,7 @@ begin
   writeln('Код: ', temp.docKey);
   writeln('Специализация: ', temp.specialisation);
   writeln('ФИО врача: ', temp.docLastName);
+  writeln('Кабинет: ', temp.cab);
   writeln('График работы:');
   for var i := Mon to Sat do
   begin
@@ -189,61 +223,61 @@ end;
 procedure printTalonList(const Head: TTalonListPt);
 var
   temp: TTalonListPt;
+  i: integer;
 begin
   if Head^.next = nil then
     writeln('Список пуст');
   temp := head^.next;
+  i := 1;
   while temp <> nil do
   begin
+    writeln(i, ')');
     printTalon(temp^.Talon);
     writeln;
     temp := temp^.next;
+    Inc(i);
   end;
 end;
 
 procedure printDocList(const Head: TDocListPt);
 var
   temp: TDocListPt;
-  i: TWeekDay;
+  i: integer;
 begin
   if Head^.next = nil then
     writeln('Список пуст');
   temp := head^.next;
+  i := 1;
   while temp <> nil do
   begin
+    writeln(i, ')');
     printDoc(temp^.Doc);
+    writeln;
+    Inc(i);
     temp := temp^.next;
   end;
 end;
 //Компараторы поиска талонов
+
+
+function searchCompTalonDocDate(temp: TTalonListPt; const Value): boolean;
+begin
+  result := (temp^.Talon.date = TDocDate(Value).Date) and (temp^.Talon.docKey = TDocDate(Value).code);
+end;
+
 function searchCompTalonDate(temp: TTalonListPt; const Value): boolean;
 begin
-  result := temp^.Talon.date = TDate(Value);
+  result := (temp^.Talon.date = TDate(Value));
 end;
 
-function searchCompTalonTime(temp: TTalonListPt; const Value): boolean;
-begin
-  result := temp^.Talon.time = TTime(Value);  
-end;
-
-function searchCompTalonQueue(temp: TTalonListPt; const Value): boolean;
-begin
-  result := temp^.Talon.queuePos = Integer(Value);  
-end;
-
-function searchCompTalonPatientLastName(temp: TTalonListPt; const Value): boolean;
-begin
-  result := temp^.Talon.patientLastName = String(Value);  
-end;
-
-function searchCompTalonCabNum(temp: TTalonListPt; const Value): boolean;
-begin
-  result := temp^.Talon.cabNum = Integer(Value);  
-end;
-                                       
 function searchCompTalonDocKey(temp: TTalonListPt; const Value): boolean;
 begin
-  result := temp^.Talon.docKey = Integer(Value);  
+  result := (temp^.Talon.docKey = Integer(Value));
+end;
+
+function searchCompTalonName(temp: TTalonListPt; const Value): boolean;
+begin
+  result := (temp^.Talon.patientLastName = String(Value));
 end;
 
 function SearchTalon(const Head: TTalonListPt; const Comp: TTalonSearchComp; const Value): TTalonArr;
@@ -295,7 +329,9 @@ begin
   end;
 end;
 
-function MakeTalon(const TalonList: TTalonListPt; const docList: TDocListPt; const Date: TDate; const Time: TTime; const patient: String; const cabNum, docKey: Integer; var ErrorCode: Integer): TTalon;
+function MakeTalon(const TalonList: TTalonListPt; const docList: TDocListPt;
+                    const Date: TDate; const Time: TTime; const patient: String;
+                    const docKey: Integer; var ErrorCode: Integer): TTalon;
 var
   DocArr: TDocArr;
   TalonArr: TTalonArr;
@@ -306,9 +342,9 @@ begin
   result.date := Date;
   result.time := Time;
   result.patientLastName := patient;
-  result.cabNum := cabNum;
   result.docKey := docKey;
   DocArr := searchDoc(docList, searchCompDocKey, docKey);
+  result.cabNum := DocArr[0].Doc.cab;
   temp := DayOfWeek(Date) - 1;
   if temp = 0 then
     temp := 6
@@ -360,7 +396,7 @@ begin
   temp^.Talon := Talon;
 end;
 
-function MakeDoc(var MaxKey: Integer; const Aspecialisation, AName: String; const ASchedule: TSchedule): TDoc;
+function MakeDoc(var MaxKey: Integer; const Aspecialisation, AName: String; acab: integer; const ASchedule: TSchedule): TDoc;
 begin
   Inc(MaxKey);
   with result do
@@ -368,6 +404,7 @@ begin
     docKey := MaxKey;
     specialisation := ASpecialisation;
     docLastName := AName;
+    cab := acab;
     Schedule := ASchedule;
   end;
 end;
@@ -385,37 +422,45 @@ begin
   temp^.Doc := Doc;
 end;
 
-procedure DeleteTalon(const Head, del: TTalonListPt; DocList: TDocListPt);
+procedure DeleteTalon(const Head: TTalonListPt; DocList: TDocListPt; num: integer);
 var
-  temp: TTalonListPt;
+  temp, temp1: TTalonListPt;
+  DocDate: TDocDate;
   TalonArr: TTalonArr;
 begin
-  TalonArr := SearchTalon(head, searchCompTalondocKey, del.Talon.docKey);
-  for var i := 0 to High(TalonArr) do
-      if (TalonArr[i].Talon.date = del.Talon.date) and (TalonArr[i].Talon.queuePos > del.Talon.queuepos) then
-        dec(TalonArr[i].Talon.queuePos);
   temp := head;
-  while temp^.next <> del do
+  for var i := 1 to num - 1 do
+  begin
     temp := temp^.next;
-  temp^.next := del^.next;
-  Dispose(del);
+  end;
+  DocDate.code := temp^.next^.Talon.docKey;
+  DocDate.Date := temp^.next^.Talon.Date;
+  TalonArr := searchTalon(head, searchCompTalonDocDate, DocDate);
+  for var i := 0 to High(TalonArr) do
+  begin
+    if TalonArr[i]^.Talon.time > temp^.next^.Talon.time then
+      Dec(TalonArr[i]^.Talon.queuePos);   
+  end;
+  temp1 := temp^.next;
+  temp^.next := temp1^.next;
+  Dispose(temp1);
 end;
 
-procedure DeleteDoc(const Head, del: TDocListPt; TalonList: TTalonListPt);
+procedure DeleteDoc(const Head: TDocListPt; TalonList: TTalonListPt; num: integer);
 var
-  temp: TDocListPt;
-  DocArr: TDocArr;
+  temp, del: TDocListPt;
   TalonArr: TTalonArr;
 begin
-  TalonArr := searchTalon(TalonList, searchCompTalonDocKey, del.Doc.docKey);
+  temp := head;
+  for var i := 1 to num - 1 do
+    temp := temp^.next;
+  del := temp^.next;
+  TalonArr := searchTalon(TalonList, searchCompTalonDocKey, del^.Doc.docKey);
   if length(TalonArr) > 0 then
   begin
     writeln('Невозможно удалить запись. К этому врачу есть талоны.');
     Exit;
   end;
-  temp := head;
-  while temp^.next <> del do
-    temp := temp^.next;
   temp^.next := del^.next;
   Dispose(del);
 end;
@@ -443,19 +488,11 @@ begin
   writeln('[3] - В главное меню.');
 end;
 
-procedure TalonFields;
+procedure Filters;
 begin
-  writeln('[1] - Дата.');
-  writeln('[2] - Время.');
-  writeln('[3] - Позиця в очереди.');
-  writeln('[4] - ФИО пациента.');
-  writeln('[5] - номер кабинета.');
-end;
-
-procedure DocFields;
-begin
-  writeln('[1] - специализация.');
-  writeln('[2] - ФИО врача.');
+  writeln('[1] - К врачу на дату.');
+  writeln('[2] - Талон по ФИО пациента.');
+  writeln('[3] - В главное меню.');
 end;
 
 procedure LookList(TalonList: TTalonListPt; DocList: TDocListPt);
@@ -468,7 +505,7 @@ begin
   1:
     printTalonList(TalonList);
   2:
-    printDocList(DocList);  
+    printDocList(DocList);
   end;
 end;
 
@@ -480,86 +517,51 @@ var
   TalonArr: TTalonArr;
   DocArr: TDocArr;
   temp: String;
+  Found: boolean;
+  DocDate: TDocDate;
 begin
-  chooseListMenu;
-  InputMenu(3, chose);
+  Filters;
+  InputMenu(2, chose);
+  Found := false;
   case chose of
   1:
   begin
-    TalonFields;
-    InputMenu(5, chose);
-    case chose of
-    1:
+    InputDate('Введите дату(формат DD.MM.YYYY): ', 'Некорректный ввод', Date);
+    Write('Введите ФИО: ');
+    Readln(temp);
+    DocArr := searchDoc(DocList, searchCompDocName, temp);
+    for var i := 0 to High(DocArr) do
     begin
-      InputDate('Введите дату(формат DD.MM.YYYY): ', 'Некорректная дата', Date);
-      TalonArr := searchTalon(TalonList, searchCompTalonDate, Date);
-    end;
-    2:
-    begin
-      InputTime('Введите время(формат HH:MM): ', 'Некорректное время', Time);
-      TalonArr := searchTalon(TalonList, searchCompTalonTime, Time);
-    end;
-    3:
-    begin
-      writeln('Введите позицию в очереди: ');
-      InputMenu(999, chose);
-      TalonArr := searchTalon(TalonList, searchCompTalonQueue, chose);
-    end;
-    4:
-    begin
-      writeln('Введите ФИО пациента: ');
-      readln(temp);
-      TalonArr := searchTalon(TalonList, searchCompTalonPatientLastName, temp);
-    end;
-    5:
-    begin
-      writeln('Введите номер кабинета: ');
-      InputMenu(999, chose);
-      TalonArr := searchTalon(TalonList, searchCompTalonCabNum, chose);
-    end;
-    end;
-    if length(TalonArr) = 0 then
-      writeln('Записи не найдены')
-    else
-    begin
-      for var i := Low(TalonArr) to High(TalonArr) do
+      with DocArr[i]^.Doc do
       begin
-        printTalon(TalonArr[i]^.Talon);
-        writeln;
+        DocDate.code := docKey;
+        DocDate.Date := Date;
+        TalonArr := searchTalon(TalonList, searchCompTalonDocDate, DocDate);
+        for var j := 0 to High(TalonArr) do
+        begin
+          Found := True;
+          PrintTalon(TalonArr[j].Talon);
+          writeln;
+        end;
       end;
     end;
   end;
   2:
   begin
-    DocFields;
-    InputMenu(2, chose);
-    case chose of
-    1:
+    Write('Введите ФИО: ');
+    Readln(temp);
+    TalonArr := searchTalon(TalonList, searchCompTalonName, temp);
+    for var j := 0 to High(TalonArr) do
     begin
-      writeln('Введите специализацию врача: ');
-      readln(temp);
-      DocArr := searchDoc(DocList, searchCompDocSpecialisation, temp);
-    end;
-    2:
-    begin
-      writeln('Введите ФИО: ');
-      readln(temp);
-      DocArr := searchDoc(DocList, searchCompDocName, temp);
-    end;
-    end;
-    if length(DocArr) = 0 then
-    writeln('Записи не найдены')
-    else
-    begin
-      for var i := Low(DocArr) to High(DocArr) do
-      begin
-        printDoc(DocArr[i]^.Doc);
-        writeln;
-      end;
-    end;
+      Found := True;
+      PrintTalon(TalonArr[j].Talon);
+      writeln;
+    end;   
   end;
+  else Found := true;
   end;
-
+  if not Found then
+    writeln('Записи не найдены');
 end;
 
 procedure AddList(TalonList: TTalonListPt; DocList: TDocListPt; MaxKey: Integer);
@@ -586,12 +588,10 @@ begin
     InputTime('Введите время(формат HH:MM): ', 'Некорректный ввод', Time);
     write('Введите ФИО пациента(Оставьте пустым если талон не выдан): ');
     readln(Name);
-    write('Введите номер кабинета: ');
-    InputMenu(999, cabNum);
     write('Введите код врача: ');
     InputMenu(999, docKey);
     errorCode := 0;
-    Talon := makeTalon(TalonList, DocList, Date, Time, Name, cabNum, docKey, ErrorCode);
+    Talon := makeTalon(TalonList, DocList, Date, Time, Name, docKey, ErrorCode);
     printTalon(Talon);
     writeln(errorCode);
     case errorcode of
@@ -611,6 +611,8 @@ begin
     readln(specialisation);
     writeln('Введите ФИО врача: ');
     readln(Name);
+    writeln('Введите кабинет врача: ');
+    InputMenu(999, chose);
     writeln('Введите расписание: ');
     for var i := Mon to Sat do
     begin
@@ -637,7 +639,7 @@ begin
         until flag;
       end;
     end;
-    Doc := MakeDoc(MaxKey, specialisation, Name, Schedule);
+    Doc := MakeDoc(MaxKey, specialisation, Name, chose, Schedule);
     AddDoc(DocList, Doc);
   end;
   end;
@@ -646,6 +648,7 @@ end;
 procedure DeleteList(TalonList: TTalonListPt; DocList: TDocListPt);
 var
   chose: integer;
+  size: integer;
   Date: TDate;
   Time: TTime;
   TalonArr: TTalonArr;
@@ -657,92 +660,102 @@ begin
   case chose of
   1:
   begin
-    TalonFields;
-    InputMenu(5, chose);
-    case chose of
-    1:
+    printTalonList(TalonList);
+    size := TalonListSize(TalonList);
+    if size > 0 then
     begin
-      InputDate('Введите дату(формат DD.MM.YYYY): ', 'Некорректная дата', Date);
-      TalonArr := searchTalon(TalonList, searchCompTalonDate, Date);
-    end;
-    2:
-    begin
-      InputTime('Введите время(формат HH:MM): ', 'Некорректное время', Time);
-      TalonArr := searchTalon(TalonList, searchCompTalonTime, Time);
-    end;
-    3:
-    begin
-      writeln('Введите позицию в очереди: ');
-      InputMenu(999, chose);
-      TalonArr := searchTalon(TalonList, searchCompTalonQueue, chose);
-    end;
-    4:
-    begin
-      writeln('Введите ФИО пациента: ');
-      readln(temp);
-      TalonArr := searchTalon(TalonList, searchCompTalonPatientLastName, temp);
-    end;
-    5:
-    begin
-      writeln('Введите номер кабинета: ');
-      InputMenu(999, chose);
-      TalonArr := searchTalon(TalonList, searchCompTalonCabNum, chose);
-    end;
-    end;
-    if length(TalonArr) = 0 then
-      writeln('Записи не найдены')
-    else
-    begin
-      for var i := Low(TalonArr) to High(TalonArr) do
-      begin
-        writeln(i + 1, ': ');
-        printTalon(TalonArr[i]^.Talon);
-        writeln;
-      end;
-      writeln('Введите номер записи для удаления');
-      InputMenu(Length(TalonArr), chose);
-      DeleteTalon(TalonList, TalonArr[chose - 1], DocList);
+      write('Введите номер записи для удаления');
+      InputMenu(size, chose);
+      DeleteTalon(TalonList, DocList, chose);
     end;
   end;
   2:
   begin
-    DocFields;
-    InputMenu(2, chose);
-    case chose of
-    1:
+    printDocList(DocList);
+    size := DocListSize(DocList);
+    if size > 0 then
     begin
-      writeln('Введите специализацию врача: ');
-      readln(temp);
-      DocArr := searchDoc(DocList, searchCompDocSpecialisation, temp);
-    end;
-    2:
-    begin
-      writeln('Введите ФИО: ');
-      readln(temp);
-      DocArr := searchDoc(DocList, searchCompDocName, temp);
-    end;
-    end;
-    if length(DocArr) = 0 then
-      writeln('Записи не найдены')
-    else
-    begin
-      for var i := Low(DocArr) to High(DocArr) do
-      begin
-        writeln(i + 1, ': ');
-        printDoc(DocArr[i]^.Doc);
-        writeln;
-      end;
-      writeln('Введите номер записи для удаления');
-      InputMenu(Length(DocArr), chose);
-      deleteDoc(DocList, DocArr[chose - 1], TalonList);
+      write('Введите номер записи для удаления');
+      InputMenu(size, chose);
+      DeleteDoc(DocList, TalonList, chose);
     end;
   end;
   end;
 end;
 
+procedure ClearTalons(head: TTalonListPt);
+var
+  temp: TTalonListPt;
+begin
+  temp := head;
+  temp^.next := nil;
+  head := head^.next;
+  while head <> nil do
+  begin
+    temp := head;
+    head := head^.next;
+    Dispose(temp);
+  end;
+end;
 
+procedure ClearDocs(head: TDocListPt);
+var
+  temp: TDocListPt;
+begin
+  temp := head;
+  temp^.next := nil;
+  head := head^.next;
+  while head <> nil do
+  begin
+    temp := head;
+    head := head^.next;
+    Dispose(temp);
+  end;
+end;
 
+procedure ReadFiles(var FTalon: TTalonFile; var FDoc: TDocFile; TalonList: TTalonListPt; DocList: TDocListPt);
+var
+  Talon: TTalon;
+  Doc: TDoc;
+begin
+  Reset(FTalon);
+  Reset(FDoc);
+  ClearTalons(TalonList);  
+  ClearDocs(DocList);
+  while not EoF(FTalon) do
+  begin
+    read(FTalon, Talon);
+    AddTalon(TalonList, Talon);
+  end;
+  while not EoF(FDoc) do
+  begin
+    read(FDoc, Doc);
+    AddDoc(DocList, doc);
+  end;
+end;
 
+procedure WriteFiles(var FTalon: TTalonFile; var FDoc: TDocFile; TalonList: TTalonListPt; DocList: TDocListPt);
+var
+  tempTalon: TTalonListPt;
+  tempDoc: TDocListPt;
+begin
+  Rewrite(FTalon);
+  Rewrite(FDoc);
+  tempTalon := TalonList^.next;
+  while tempTalon <> nil do
+  begin
+    write(FTalon, tempTalon^.Talon);
+    tempTalon := tempTalon^.next;
+  end;
+  tempdoc := DocList^.next;
+  while tempDoc <> nil do
+  begin
+    write(FDoc, tempdoc^.Doc);
+    tempDoc := tempDoc^.next;
+  end;
+end;
+
+      {
 procedure Fill(TalonList: TTalonListPt; DocList: TDocListPt; var MaxKey: Integer);
 var
   Schedule: TSchedule;
@@ -754,19 +767,19 @@ begin
       start := StrToTime('09:00');
       finish := StrToTime('14:00');
     end;
-  AddDoc(DocList, MakeDoc(MaxKey, 'Терапевт', 'Иванов', Schedule));
-  AddDoc(DocList, MakeDoc(MaxKey, 'Терапевт', 'Петров', Schedule));
-  AddDoc(DocList, MakeDoc(MaxKey, 'Педиатр', 'Петрова', Schedule));
-  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('24.03.2025'), StrToTime('09:00'), 'Шимко', 26, 1, errorCode));
-  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('24.03.2025'), StrToTime('10:00'), 'Арещенко', 26, 1, errorCode));
-  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('24.03.2025'), StrToTime('11:00'), 'Коршунов', 26, 1, errorCode));
-  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('25.03.2025'), StrToTime('09:00'), 'Шимко', 27, 2, errorCode));
-  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('25.03.2025'), StrToTime('10:00'), 'Арещенко', 27, 2, errorCode));
-  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('25.03.2025'), StrToTime('11:00'), 'Коршунов', 27, 2, errorCode));
-  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('26.03.2025'), StrToTime('09:00'), 'Шимко', 27, 3, errorCode));
-  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('26.03.2025'), StrToTime('10:00'), 'Арещенко', 27, 3, errorCode));
-  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('26.03.2025'), StrToTime('11:00'), 'Коршунов', 27, 3, errorCode));
-end;
+  AddDoc(DocList, MakeDoc(MaxKey, 'Терапевт', 'Иванов', 26, Schedule));
+  AddDoc(DocList, MakeDoc(MaxKey, 'Терапевт', 'Петров', 27, Schedule));
+  AddDoc(DocList, MakeDoc(MaxKey, 'Педиатр', 'Петрова', 28, Schedule));
+  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('24.03.2025'), StrToTime('09:00'), 'Шимко', 1, errorCode));
+  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('24.03.2025'), StrToTime('10:00'), 'Арещенко', 1, errorCode));
+  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('24.03.2025'), StrToTime('11:00'), 'Коршунов', 1, errorCode));
+  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('25.03.2025'), StrToTime('09:00'), 'Шимко', 2, errorCode));
+  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('25.03.2025'), StrToTime('10:00'), 'Арещенко', 2, errorCode));
+  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('25.03.2025'), StrToTime('11:00'), 'Коршунов', 2, errorCode));
+  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('26.03.2025'), StrToTime('09:00'), 'Шимко', 3, errorCode));
+  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('26.03.2025'), StrToTime('10:00'), 'Арещенко', 3, errorCode));
+  AddTalon(TalonList, MakeTalon(TalonList, DocList, StrToDate('26.03.2025'), StrToTime('11:00'), 'Коршунов', 3, errorCode));
+end;          }
 
 var
   TalonList: TTalonListPt;
@@ -774,22 +787,26 @@ var
   isOn: boolean;
   temp: integer;
   MaxKey: Integer;
+  FDoc: TDocFile;
+  FTalon: TTalonFile;
 
 begin
   New(TalonList);
   TalonList^.next := nil;
   New(DocList);
   DocList^.next := nil;
-  fill(TalonList, DocList, MaxKey);
+  //fill(TalonList, DocList, MaxKey);
   isOn := true;
   MaxKey := 0;
+  Assign(FTalon, 'Talons.dat');
+  Assign(FDoc, 'Docss.dat');
   while isOn do
   begin
     MainMenu;
     InputMenu(10, temp);
     case temp of
     1:
-      continue;
+      ReadFiles(FTalon, FDoc, TalonList, DocList);
     2:
       LookList(TalonList, DocList);
     3:
@@ -802,6 +819,15 @@ begin
       DeleteList(TalonList, DocList);
     9:
       isOn := false;
+    10:
+    begin
+      isOn := false;
+      WriteFiles(FTalon, FDoc, TalonList, DocList);
+    end;
     end;
   end;
+  ClearTalons(TalonList);
+  Dispose(TalonList);
+  ClearDocs(docList);
+  Dispose(DocList);
 end.
