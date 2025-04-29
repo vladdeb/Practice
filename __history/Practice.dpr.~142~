@@ -7,8 +7,10 @@ program Practice;
 uses
   System.SysUtils;
 
+const
+  eps = 0.00001;
+
 type
-  TMenu = (mnMain, mnList, mnTalonField, mnDocField);
   TWeekDay = (Mon, Tue, Wed, Thu, Fri, Sat, Sun);
   TWorkDay = Mon..Sat;
   TWorkHours = record
@@ -43,6 +45,8 @@ type
   end;
   TTalonSearchComp = function(temp: TTalonListPt; const Value): boolean;
   TDocSearchComp = function(temp: TDocListPt; const Value): boolean;
+  TTalonSortComp = function(a, b: TTalonListPt): boolean;
+  TDocSortComp = function(a, b: TDocListPt): boolean;
   TTalonArr = array of TTalonListPt;
   TDocArr = array of TDocListPt;
   TTalonFile = file of TTalon;
@@ -53,6 +57,10 @@ type
   end;          
   TDocNameDate = record
     name: string;
+    Date: TDate;
+  end;
+  TSpecDate = record
+    spec: string;
     Date: TDate;
   end;
 
@@ -172,6 +180,50 @@ begin
   Time := StrToTime(temp);
 end;
 
+function TalonListSize(head: TTalonListPt): integer;
+begin
+  result := 0;   
+  head := head^.next;
+  while head <> nil do
+  begin
+    Inc(result);
+    head := head^.next;
+  end;
+end;
+
+function DocListSize(head: TDocListPt): integer;
+begin
+  result := 0;
+  head := head^.next;
+  while head <> nil do
+  begin
+    Inc(result);
+    head := head^.next;
+  end;
+end;
+
+function GetTalon(head: TTalonListPt; num: integer): TTalonListPt;
+var
+  temp: TTalonListPt;
+  i: Integer;
+begin
+  temp := head^.next;
+  for i := 1 to num - 1 do
+    temp := temp^.next;
+  result := temp;
+end;
+
+function GetDoc(head: TDocListPt; num: integer): TDocListPt;
+var
+  temp: TDocListPt;
+  i: Integer;
+begin
+  temp := head^.next;
+  for i := 1 to num - 1 do
+    temp := temp^.next;
+  result := temp;
+end;
+
 procedure printTalon(temp: TTalon);
 begin
   writeln('Дата: ', DateToStr(temp.date));
@@ -235,7 +287,196 @@ begin
     temp := temp^.next;
   end;
 end;
-//Компараторы поиска талонов
+
+//SORTING
+
+function sortCompTalonName(a, b: TTalonListPt): boolean;
+begin
+  result := a^.Talon.patientLastName <= b^.Talon.patientLastName;
+end;
+
+function sortCompTalonDate(a, b: TTalonListPt): boolean;
+begin
+  result := a^.Talon.Date <= b^.Talon.Date;
+end;
+
+function sortCompTalonKey(a, b: TTalonListPt): boolean;
+begin
+  result := a^.Talon.dockey <= b^.Talon.dockey;
+end;
+
+function MergeSortedTalons(list1, list2: TTalonListPt; Comp: TTalonSortComp): TTalonListPt;
+var
+  pCur, p1, p2: TTalonListPt;
+begin
+  p1 := list1;
+  p2 := list2;
+  if Comp(p1, p2) then
+  begin
+    pCur := p1;
+    p1 := p1^.next;
+  end
+  else
+  begin
+    pCur := p2;
+    p2 := p2^.next;
+  end;
+  Result := pCur;
+  while (p1 <> nil) and (p2 <> nil) do
+  begin
+    if Comp(p1, p2) then
+      begin
+        pCur^.Next := p1;
+        pCur := p1;
+        p1 := p1^.Next;
+      end
+      else begin
+        pCur^.Next := p2;
+        pCur := p2;
+        p2 := p2^.Next;
+      end;
+  end;
+  if p1 <> nil then
+    pCur^.Next := p1
+  else
+    pCur^.Next := p2;
+end;
+
+procedure SortTalons(TalonList: TTalonListPt; Comp: TTalonSortComp);
+type
+  TStackItem = record
+    level: integer;
+    Item: TTalonListPt;
+  end;
+  TStack = array[0..31] of TStackItem;
+
+var
+  Stack: TStack;
+  StackPos: Integer;
+  p: TTalonListPt;
+begin
+  StackPos := 0;
+  p := TalonList^.next;
+  while p <> nil do
+  begin
+    Stack[StackPos].level := 1;
+    Stack[StackPos].Item := p;
+    p := p^.next;
+    Stack[StackPos].Item^.next := nil;
+    Inc(StackPos);
+    while (StackPos >= 2) and (Stack[StackPos - 1].Level = Stack[StackPos - 2].level) do
+    begin
+      Stack[StackPos - 2].Item := MergeSortedTalons(Stack[StackPos - 1].Item, Stack[StackPos - 2].Item, Comp);
+      Inc(Stack[StackPos - 2].level);
+      Dec(StackPos);
+    end;
+  end;
+  while (StackPos >= 2) do
+  begin
+    Stack[StackPos - 2].Item := MergeSortedTalons(Stack[StackPos - 1].Item, Stack[StackPos - 2].Item, Comp);
+    Inc(Stack[StackPos - 2].level);
+    Dec(StackPos);
+  end;
+  if StackPos > 0 then
+  begin
+    TalonList^.next := Stack[0].Item;
+  end;
+end;
+
+function sortCompDocName(a, b: TDocListPt): boolean;
+begin
+  result := a^.Doc.docLastName <= b^.Doc.docLastName;
+end;
+
+function sortCompDocSpecialisation(a, b: TDocListPt): boolean;
+begin
+  result := a^.Doc.specialisation <= b^.Doc.specialisation;
+end;
+
+function sortCompDocKey(a, b: TDocListPt): boolean;
+begin
+  result := a^.Doc.docKey <= b^.Doc.docKey;
+end;
+
+function MergeSortedDocs(list1, list2: TDocListPt; Comp: TDocSortComp): TDocListPt;
+var
+  pCur, p1, p2: TDocListPt;
+begin
+  p1 := list1;
+  p2 := list2;
+  if Comp(p1, p2) then
+  begin
+    pCur := p1;
+    p1 := p1^.next;
+  end
+  else
+  begin
+    pCur := p2;
+    p2 := p2^.next;
+  end;
+  Result := pCur;
+  while (p1 <> nil) and (p2 <> nil) do
+  begin
+    if Comp(p1, p2) then
+      begin
+        pCur^.Next := p1;
+        pCur := p1;
+        p1 := p1^.Next;
+      end
+      else begin
+        pCur^.Next := p2;
+        pCur := p2;
+        p2 := p2^.Next;
+      end;
+  end;
+  if p1 <> nil then
+    pCur^.Next := p1
+  else
+    pCur^.Next := p2;
+end;
+
+procedure SortDocs(DocList: TDocListPt; Comp: TDocSortComp);
+type
+  TStackItem = record
+    level: integer;
+    Item: TDocListPt;
+  end;
+  TStack = array[0..31] of TStackItem;
+
+var
+  Stack: TStack;
+  StackPos: Integer;
+  p: TDocListPt;
+begin
+  StackPos := 0;
+  p := DocList^.next;
+  while p <> nil do
+  begin
+    Stack[StackPos].level := 1;
+    Stack[StackPos].Item := p;
+    p := p^.next;
+    Stack[StackPos].Item^.next := nil;
+    Inc(StackPos);
+    while (StackPos >= 2) and (Stack[StackPos - 1].Level = Stack[StackPos - 2].level) do
+    begin
+      Stack[StackPos - 2].Item := MergeSortedDocs(Stack[StackPos - 1].Item, Stack[StackPos - 2].Item, Comp);
+      Inc(Stack[StackPos - 2].level);
+      Dec(StackPos);
+    end;
+  end;
+  while (StackPos >= 2) do
+  begin
+    Stack[StackPos - 2].Item := MergeSortedDocs(Stack[StackPos - 1].Item, Stack[StackPos - 2].Item, Comp);
+    Inc(Stack[StackPos - 2].level);
+    Dec(StackPos);
+  end;
+  if StackPos > 0 then
+  begin
+    DocList^.next := Stack[0].Item;
+  end;
+end;
+
+//SEARCH
 
 
 function searchCompTalonDocDate(temp: TTalonListPt; const Value): boolean;
@@ -256,6 +497,12 @@ end;
 function searchCompTalonName(temp: TTalonListPt; const Value): boolean;
 begin
   result := (temp^.Talon.patientLastName = String(Value));
+end;
+
+function searchCompTalonDocDateFree(temp: TTalonListPt; const Value): boolean;
+begin
+  result := (temp^.Talon.date = TDocDate(Value).Date) and (temp^.Talon.docKey = TDocDate(Value).code)
+            and (temp^.Talon.patientLastName = '');
 end;
 
 function SearchTalon(const Head: TTalonListPt; const Comp: TTalonSearchComp; const Value): TTalonArr;
@@ -288,6 +535,11 @@ end;
 function searchCompDocName(temp: TDocListPt; const Value): boolean;
 begin
   result := temp^.Doc.doclastName = String(Value);
+end;
+
+function searchCompDocCab(temp: TDocListPt; const Value): boolean;
+begin
+  result := temp^.Doc.cab = Integer(Value);
 end;
 
 function SearchDoc(const Head: TDocListPt; const Comp: TDocSearchComp; const Value): TDocArr;
@@ -341,19 +593,24 @@ begin
     begin
       if TalonArr[i]^.Talon.date = Date then
       begin
-        if TalonArr[i]^.Talon.time = Time then
+        if Abs(TalonArr[i]^.Talon.time - Time) < eps then
           errorCode := 3;
       end;
     end;
     if errorCode = 0 then
     begin
+      if patient = '' then
+      begin
+        result.queuePos := 0;
+        Exit;
+      end;
       for var i := Low(TalonArr) to High(TalonArr) do
       begin
         if TalonArr[i]^.Talon.date = Date then
         begin
-          if TalonArr[i]^.Talon.time < Time then
+          if (TalonArr[i]^.Talon.time < Time) and (TalonArr[i]^.Talon.patientLastName <> '') then
             Inc(result.queuePos);
-          if TalonArr[i]^.Talon.time > Time then
+          if (TalonArr[i]^.Talon.time > Time) and (TalonArr[i]^.Talon.patientLastName <> '') then
             Inc(TalonArr[i]^.Talon.queuePos);
         end;
       end;
@@ -402,39 +659,46 @@ end;
 
 procedure DeleteTalon(const Head: TTalonListPt; DocList: TDocListPt; num: integer);
 var
-  temp: TTalonListPt;
+  temp, temp1: TTalonListPt;
   DocDate: TDocDate;
   TalonArr: TTalonArr;
 begin
   temp := head;
-  for var i := 1 to num do
+  for var i := 1 to num - 1 do
   begin
     temp := temp^.next;
   end;
   DocDate.code := temp^.next^.Talon.docKey;
   DocDate.Date := temp^.next^.Talon.Date;
   TalonArr := searchTalon(head, searchCompTalonDocDate, DocDate);
-  for var i := 0 to High(TalonArr) do
+  if temp^.next^.Talon.patientLastName <> '' then
   begin
-    if TalonArr[i]^.Talon.time > temp^.next^.Talon.time then
-      Dec(TalonArr[i]^.Talon.queuePos);   
+    for var i := 0 to High(TalonArr) do
+    begin
+      if (TalonArr[i]^.Talon.time > temp^.next^.Talon.time) and (TalonArr[i]^.Talon.patientLastName <> '') then
+        Dec(TalonArr[i]^.Talon.queuePos);
+    end;
   end;
+  temp1 := temp^.next;
+  temp^.next := temp1^.next;
+  Dispose(temp1);
 end;
 
-procedure DeleteDoc(const Head, del: TDocListPt; TalonList: TTalonListPt);
+procedure DeleteDoc(const Head: TDocListPt; TalonList: TTalonListPt; num: integer);
 var
-  temp: TDocListPt;
+  temp, del: TDocListPt;
   TalonArr: TTalonArr;
 begin
-  TalonArr := searchTalon(TalonList, searchCompTalonDocKey, del.Doc.docKey);
+  temp := head;
+  for var i := 1 to num - 1 do
+    temp := temp^.next;
+  del := temp^.next;
+  TalonArr := searchTalon(TalonList, searchCompTalonDocKey, del^.Doc.docKey);
   if length(TalonArr) > 0 then
   begin
     writeln('Невозможно удалить запись. К этому врачу есть талоны.');
     Exit;
   end;
-  temp := head;
-  while temp^.next <> del do
-    temp := temp^.next;
   temp^.next := del^.next;
   Dispose(del);
 end;
@@ -483,11 +747,54 @@ begin
   end;
 end;
 
+procedure SortList(TalonList: TTalonListPt; DocList: TDocListPt);
+var
+  chose: integer;
+  TalonComp: TTalonSortComp;
+  DocComp: TDocSortComp;
+begin
+  chooseListMenu;
+  InputMenu(3, chose);
+  case chose of
+  1:
+  begin
+    writeln('[1] - По ФИО пациента');
+    writeln('[2] - По дате');
+    writeln('[3] - По коду врача');
+    InputMenu(3, chose);
+    case chose of
+    1:
+      TalonComp := sortCompTalonName;
+    2:
+      TalonComp := sortCompTalonDate;
+    3:
+      TalonComp := sortCompTalonKey;
+    end;
+    SortTalons(TalonList, TalonComp);
+  end;
+  2:
+  begin
+    writeln('[1] - По ФИО врача');
+    writeln('[2] - По специализации');
+    writeln('[3] - По коду врача');
+    InputMenu(3, chose);
+    case chose of
+    1:
+      DocComp := sortCompDocName;
+    2:
+      DocComp := sortCompDocSpecialisation;
+    3:
+      DocComp := sortCompDocKey;
+    end;
+    SortDocs(DocList, DocComp);
+  end;
+  end;
+end;
+
 procedure searchList(TalonList: TTalonListPt; DocList: TDocListPt);
 var
   chose: integer;
   Date: TDate;
-  Time: TTime;
   TalonArr: TTalonArr;
   DocArr: TDocArr;
   temp: String;
@@ -544,7 +851,6 @@ var
   Date: TDate;
   Time: TTime;
   docKey: Integer;
-  cabNum: Integer;
   specialisation, Name: String;
   ErrorCode: Integer;
   Talon: TTalon;
@@ -622,18 +928,319 @@ end;
 procedure DeleteList(TalonList: TTalonListPt; DocList: TDocListPt);
 var
   chose: integer;
-  Date: TDate;
-  Time: TTime;
-  TalonArr: TTalonArr;
-  DocArr: TDocArr;
-  temp: String;
+  size: integer;
 begin
   chooseListMenu;
   InputMenu(3, chose);
   case chose of
   1:
   begin
-  
+    printTalonList(TalonList);
+    size := TalonListSize(TalonList);
+    if size > 0 then
+    begin
+      write('Введите номер записи для удаления');
+      InputMenu(size, chose);
+      DeleteTalon(TalonList, DocList, chose);
+    end;
+  end;
+
+  2:
+  begin
+    printDocList(DocList);
+    size := DocListSize(DocList);
+    if size > 0 then
+    begin
+      write('Введите номер записи для удаления');
+      InputMenu(size, chose);
+      DeleteDoc(DocList, TalonList, chose);
+    end;
+  end;
+  end;
+end;
+
+procedure ChangeList(TalonList: TTalonListPt; DocList: TDocListPt);
+var
+  newTalon: TTalon;
+  newDoc: TDoc;
+  TalonArr: TTalonArr;
+  DocArr: TDocArr;
+  DocDate: TDocDate;
+  TalonPt: TTalonListPt;
+  DocPt: TDocListPt;
+  diff, size, chose: integer;
+  temp: Word;
+  WeekDay: TweekDay;
+  flag: boolean;
+  Schedule: TSchedule;
+
+begin
+  chooseListMenu;
+  InputMenu(3, chose);
+  case chose of
+  1:
+  begin
+    printTalonList(TalonList);
+    size := TalonListSize(TalonList);
+    if size > 0 then
+    begin
+      write('Введите номер записи для изменения');
+      InputMenu(size, Chose);
+      TalonPt := GetTalon(TalonList, chose);
+      newTalon := TalonPt^.Talon;
+      writeln('[1] - Изменить ФИО пациента');
+      writeln('[2] - Изменить время');
+      writeln('[3] - Изменить дату');
+      writeln('[4] - Изменить код врача');
+      InputMenu(4, chose);
+      case chose of
+      1:
+      begin
+        write('Введите новое ФИО: ');
+        readln(newTalon.patientLastName);
+      end;
+      3:
+      begin
+        InputDate('Введите новую дату(формат DD.MM.YYYY): ', 'Некорректный ввод', newTalon.Date);
+      end;
+      2:
+      begin
+        InputTime('Введите новое время(формат HH:MM): ', 'Некорректный ввод', newTalon.Time);
+      end;
+      4:
+      begin
+        write('Введите новый код врача: ');
+        InputMenu(999, newTalon.docKey);
+      end;
+      end;
+      DocDate.code := newTalon.docKey;
+      DocDate.Date := newTalon.Date;
+      DocArr := SearchDoc(DocList, searchCompDocKey, newTalon.docKey);
+      if Length(docArr) = 0 then
+      begin
+        writeln('Врача не существует');
+        Exit;
+      end;
+
+      newTalon.cabNum := DocArr[0]^.Doc.cab;
+      temp := DayOfWeek(newTalon.Date) - 1;
+      if temp = 0 then
+        temp := 6
+      else
+        Dec(temp);
+      WeekDay := TWeekDay(temp);
+      if (NewTalon.time < DocArr[0]^.Doc.Schedule[WeekDay].start) or
+          (NewTalon.time >= DocArr[0]^.Doc.Schedule[WeekDay].finish) then
+      begin
+        writeln('Врач в это время не принимает');
+        Exit;
+      end;
+      TalonArr := SearchTalon(TalonList, searchCompTalonDocDate, DocDate);
+      for var i := 0 to High(TalonArr) do
+      begin
+        if (TalonArr[i]^.Talon.time = newTalon.time) and (TalonArr[i] <> TalonPt)  then
+        begin
+          writeln('Такой талон уже существует');
+          Exit;
+        end;
+      end;
+      newTalon.queuePos := 1;
+      if newTalon.patientLastName = '' then
+      begin
+        newTalon.queuePos := 0;
+      end
+      else
+      begin
+        for var i := 0 to High(TalonArr) do
+        begin
+          if (TalonArr[i]^.Talon.time > newTalon.time) and (TalonArr[i]^.Talon.patientLastName <> '') then
+            Inc(TalonArr[i]^.Talon.queuePos);
+          if (TalonArr[i]^.Talon.time < newTalon.time) and (TalonArr[i] <> TalonPt)
+             and (TalonArr[i]^.Talon.patientLastName <> '') then
+            Inc(newTalon.queuePos);
+        end;
+      end;
+      DocDate.code := TalonPt^.Talon.docKey;
+      DocDate.Date := TalonPt^.Talon.Date;
+      TalonArr := SearchTalon(TalonList, searchCompTalonDocDate, DocDate);
+      if TalonPt^.Talon.patientLastName <> '' then
+        for var i := 0 to High(TalonArr) do
+        begin
+          if (TalonArr[i]^.Talon.time > TalonPt^.Talon.time) and (TalonArr[i]^.Talon.patientLastName <> '') then
+            Dec(TalonArr[i]^.Talon.queuePos);
+        end;
+      TalonPt^.Talon := newTalon;
+    end;
+  end;
+  2:
+  begin
+    printDocList(DocList);
+    size := DocListSize(DocList);
+    if size > 0 then
+    begin
+      write('Введите номер записи для изменения: ');
+      InputMenu(size, chose);
+      DocPt := GetDoc(DocList, chose);
+      TalonArr := searchTalon(TalonList, searchCompTalonDocKey, DocPt^.Doc.docKey);
+      if Length(TalonArr) <> 0 then
+      begin
+        writeln('Изменение невозможно, к врачу есть талоны');
+        Exit;
+      end;
+      writeln('[1] - Изменить ФИО');
+      writeln('[2] - Изменить Специализацию');
+      writeln('[3] - Изменить График');
+      writeln('[4] - Изменить Кабинет');
+      InputMenu(4, chose);
+      case chose of
+      1:
+      begin
+        write('Новое ФИО: ');
+        readln(DocPt^.Doc.docLastName);
+      end;
+      2:
+      begin
+        write('Новая специализация: ');
+        readln(DocPt^.Doc.specialisation);
+      end;
+      3:
+      begin
+        writeln('Новый график: ');
+        for var i := Mon to Sat do
+        begin
+          writeln(WeekNames[i], ': ');
+          writeln('Врач работает в этот день(1 если да, 2 если нет):');
+          InputMenu(2, Chose);
+          if chose = 2 then
+          begin
+            Schedule[i].start := StrToTime('09:00');
+            Schedule[i].finish := StrToTime('08:00');
+          end
+          else
+          begin
+            flag := false;
+            repeat
+              InputTime('Начало работы: ', 'Некорректный ввод', Schedule[i].start);
+              InputTime('Конец работы: ', 'Некорректный ввод', Schedule[i].finish);
+              if Schedule[i].start >= Schedule[i].finish then
+              begin
+                writeln('Время начала должно быть раньше времени конца');
+              end
+              else
+                flag := true;
+            until flag;
+          end;
+        end;
+        DocPt^.Doc.Schedule := Schedule;
+      end;
+      4:
+      begin
+        writeln('Новый кабинет: ');
+        InputMenu(999, chose);
+        DocArr := searchDoc(DocList, searchCompDocCab, chose);
+        if Length(DocArr) <> 0 then
+        begin
+          writeln('Кабинет занят');
+          Exit;
+        end;
+        DocPt^.Doc.cab := chose;
+      end;
+      end;
+    end;
+  end;
+  end;
+end;
+
+procedure SpecialFunctions(TalonList: TTalonListPt; DocList: TDoclistPt);
+var
+  Chose: integer;
+  Date: TDate;
+  temp: Word;
+  Time: TTime;
+  Talon: TTalon;
+  WeekDay: TWeekDay;
+  tempDoc: TDocListPt;
+  errorCode, count: integer;
+  spec, name: string;
+  DocArr: TDocArr;
+  TalonArr: TTalonArr;
+  DocDate: TDocDate;
+  tempList: TTalonListPt;
+begin
+  writeln('[1] - Генерация талонов на неделю');
+  writeln('[2] - Выдача талонов');
+  writeln('[3] - В главное меню');
+  InputMenu(3, chose);
+  case chose of
+  1:
+  begin
+    InputDate('Введите дату(формат DD.MM.YYYY): ', 'Некорректный ввод', Date);
+    tempDoc := DocList^.next;
+    while tempDoc <> nil do
+    begin
+      for var i := 0 to 6 do
+      begin
+        temp := DayOfWeek(Date + i) - 1;
+        if temp = 0 then
+          temp := 6
+        else
+          Dec(temp);
+        WeekDay := TWeekDay(temp);
+        if WeekDay <> Sun then
+        begin
+          Time := tempDoc^.Doc.Schedule[WeekDay].start;
+          while Time < tempDoc^.Doc.Schedule[WeekDay].finish do
+          begin
+            Talon := MakeTalon(TalonList, DocList, Date + i, Time, '', tempDoc^.Doc.docKey, errorCode);
+            if errorCode = 0 then
+              AddTalon(TalonList, Talon);
+            Time := Time + StrToTime('00:20');
+          end;
+        end;
+      end;
+      tempDoc := tempDoc^.next;
+    end;
+  end;
+  2:
+  begin
+    write('Введите специализацию: ');
+    readln(spec);
+    DocArr := searchDoc(DocList, searchCompDocSpecialisation, spec);
+    InputDate('Введите дату(формат DD.MM.YYYY): ', 'Некорректный ввод', Date);
+    InputTime('Введите время(будут подобраны талоны в районе получаса)(формат HH:MM): ', 'Некорректный ввод', Time);
+    New(tempList);
+    count := 0;
+    tempList^.next := nil;
+    for var i := 0 to High(DocArr) do
+    begin
+      writeln('Врач ', DocArr[i]^.Doc.docLastName, ': ');
+      DocDate.code := DocArr[i]^.Doc.docKey;
+      DocDate.date := Date;
+      TalonArr := searchTalon(TalonList, searchCompTalonDocDateFree, DocDate);
+      for var j := 0 to High(TalonArr) do
+      begin
+        if Abs(TalonArr[i]^.Talon.time - Time) < StrToTime('00:30') then
+        begin
+          AddTalon(tempList, TalonArr[i]^.Talon);
+          inc(count);
+          writeln(count);
+          printTalon(TalonArr[i]^.Talon);
+        end;
+      end;
+    end;
+    write('Выберите номер талона: ');
+    InputMenu(count, chose);
+    write('Введите ваше ФИО: ');
+    tempList := GetTalon(tempList, chose);
+    readln(tempList^.Talon.patientLastName);
+    DocDate.code := tempList^.Talon.docKey;
+    DocDate.date := Date;
+    TalonArr := searchTalon(TalonList, searchCompTalonDocDate, DocDate);
+    for var i := 0 to High(TalonArr) do
+    begin
+    if (TalonArr[i]^.Talon.time > tempList^.Talon.time) and (TalonArr[i]^.Talon.patientLastName <> '') then
+     Dec(TalonArr[i]^.Talon.queuePos);
+    end;
   end;
   end;
 end;
@@ -765,13 +1372,17 @@ begin
     2:
       LookList(TalonList, DocList);
     3:
-      continue;
+      SortList(TalonList, DocList);
     4:
       SearchList(TalonList, DocList);
     5:
       AddList(TalonList, DocList, MaxKey);
     6:
       DeleteList(TalonList, DocList);
+    7:
+      ChangeList(TalonList, DocList);
+    8:
+      SpecialFunctions(TalonList, DocList);
     9:
       isOn := false;
     10:
