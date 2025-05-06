@@ -59,10 +59,6 @@ type
     name: string;
     Date: TDate;
   end;
-  TSpecDate = record
-    spec: string;
-    Date: TDate;
-  end;
 
 const
   WeekNames: array[TWeekDay] of String = ('Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье');
@@ -96,7 +92,7 @@ begin
       result := false;
     if M > 12 then
       result := false;
-    if D > MonthDays[M] then
+    if result and (D > MonthDays[M]) then
       if not ((M = 2) and ((Y mod 400 = 0) or ((Y mod 100 <> 0) and (Y mod 4 = 0))) and (D <= 29)) then
         result := false;
   end;
@@ -939,7 +935,7 @@ begin
     size := TalonListSize(TalonList);
     if size > 0 then
     begin
-      write('Введите номер записи для удаления');
+      write('Введите номер записи для удаления: ');
       InputMenu(size, chose);
       DeleteTalon(TalonList, DocList, chose);
     end;
@@ -951,7 +947,7 @@ begin
     size := DocListSize(DocList);
     if size > 0 then
     begin
-      write('Введите номер записи для удаления');
+      write('Введите номер записи для удаления: ');
       InputMenu(size, chose);
       DeleteDoc(DocList, TalonList, chose);
     end;
@@ -1163,9 +1159,8 @@ var
   errorCode, count: integer;
   spec, name: string;
   DocArr: TDocArr;
-  TalonArr: TTalonArr;
+  TalonArr, tempArr: TTalonArr;
   DocDate: TDocDate;
-  tempList: TTalonListPt;
 begin
   writeln('[1] - Генерация талонов на неделю');
   writeln('[2] - Выдача талонов');
@@ -1208,9 +1203,7 @@ begin
     DocArr := searchDoc(DocList, searchCompDocSpecialisation, spec);
     InputDate('Введите дату(формат DD.MM.YYYY): ', 'Некорректный ввод', Date);
     InputTime('Введите время(будут подобраны талоны в районе получаса)(формат HH:MM): ', 'Некорректный ввод', Time);
-    New(tempList);
     count := 0;
-    tempList^.next := nil;
     for var i := 0 to High(DocArr) do
     begin
       writeln('Врач ', DocArr[i]^.Doc.docLastName, ': ');
@@ -1219,27 +1212,35 @@ begin
       TalonArr := searchTalon(TalonList, searchCompTalonDocDateFree, DocDate);
       for var j := 0 to High(TalonArr) do
       begin
-        if Abs(TalonArr[i]^.Talon.time - Time) < StrToTime('00:30') then
+        if Abs(TalonArr[j]^.Talon.time - Time) < StrToTime('00:30') then
         begin
-          AddTalon(tempList, TalonArr[i]^.Talon);
+          setLength(tempArr, length(tempArr) + 1);
+          tempArr[High(tempArr)] := TalonArr[i];
           inc(count);
           writeln(count);
-          printTalon(TalonArr[i]^.Talon);
+          printTalon(TalonArr[j]^.Talon);
         end;
       end;
     end;
+    if count = 0 then
+    begin
+      writeln('Свободных талонов не найдено');
+      Exit;
+    end;
     write('Выберите номер талона: ');
     InputMenu(count, chose);
+    Dec(chose);
     write('Введите ваше ФИО: ');
-    tempList := GetTalon(tempList, chose);
-    readln(tempList^.Talon.patientLastName);
-    DocDate.code := tempList^.Talon.docKey;
+    readln(tempArr[chose]^.Talon.patientLastName);
+    DocDate.code := tempArr[chose]^.Talon.docKey;
     DocDate.date := Date;
     TalonArr := searchTalon(TalonList, searchCompTalonDocDate, DocDate);
     for var i := 0 to High(TalonArr) do
     begin
-    if (TalonArr[i]^.Talon.time > tempList^.Talon.time) and (TalonArr[i]^.Talon.patientLastName <> '') then
-     Dec(TalonArr[i]^.Talon.queuePos);
+      if (TalonArr[i]^.Talon.time > tempArr[chose]^.Talon.time) and (TalonArr[i]^.Talon.patientLastName <> '') then
+        Inc(TalonArr[i]^.Talon.queuePos)
+      else
+        if (TalonArr[i]^.Talon.patientLastName <> '') then Inc(tempArr[chose]^.Talon.queuePos);
     end;
   end;
   end;

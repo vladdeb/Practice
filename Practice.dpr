@@ -59,6 +59,8 @@ type
     name: string;
     Date: TDate;
   end;
+  TText = Text;
+
 
 const
   WeekNames: array[TWeekDay] of String = ('Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье');
@@ -92,7 +94,7 @@ begin
       result := false;
     if M > 12 then
       result := false;
-    if D > MonthDays[M] then
+    if result and (D > MonthDays[M]) then
       if not ((M = 2) and ((Y mod 400 = 0) or ((Y mod 100 <> 0) and (Y mod 4 = 0))) and (D <= 29)) then
         result := false;
   end;
@@ -904,8 +906,8 @@ begin
       begin
         flag := false;
         repeat
-          InputTime('Начало работы: ', 'Некорректный ввод', Schedule[i].start);
-          InputTime('Конец работы: ', 'Некорректный ввод', Schedule[i].finish);
+          InputTime('Начало работы(формат HH:MM): ', 'Некорректный ввод', Schedule[i].start);
+          InputTime('Конец работы(формат HH:MM): ', 'Некорректный ввод', Schedule[i].finish);
           if Schedule[i].start >= Schedule[i].finish then
           begin
             writeln('Время начала должно быть раньше времени конца');
@@ -935,7 +937,7 @@ begin
     size := TalonListSize(TalonList);
     if size > 0 then
     begin
-      write('Введите номер записи для удаления');
+      write('Введите номер записи для удаления: ');
       InputMenu(size, chose);
       DeleteTalon(TalonList, DocList, chose);
     end;
@@ -947,7 +949,7 @@ begin
     size := DocListSize(DocList);
     if size > 0 then
     begin
-      write('Введите номер записи для удаления');
+      write('Введите номер записи для удаления: ');
       InputMenu(size, chose);
       DeleteDoc(DocList, TalonList, chose);
     end;
@@ -1147,7 +1149,7 @@ begin
   end;
 end;
 
-procedure SpecialFunctions(TalonList: TTalonListPt; DocList: TDoclistPt);
+procedure SpecialFunctions(var F: Text; TalonList: TTalonListPt; DocList: TDoclistPt);
 var
   Chose: integer;
   Date: TDate;
@@ -1173,6 +1175,7 @@ begin
     tempDoc := DocList^.next;
     while tempDoc <> nil do
     begin
+      Rewrite(F);
       for var i := 0 to 6 do
       begin
         temp := DayOfWeek(Date + i) - 1;
@@ -1188,7 +1191,15 @@ begin
           begin
             Talon := MakeTalon(TalonList, DocList, Date + i, Time, '', tempDoc^.Doc.docKey, errorCode);
             if errorCode = 0 then
+            begin
               AddTalon(TalonList, Talon);
+              writeln(F, 'Дата: ', DateToStr(Talon.date));
+              writeln(F, 'Время: ', TimeToStr(Talon.time));
+              writeln(F, 'ФИО врача: ', tempDoc^.Doc.docLastName);
+              writeln(F, 'Специализация врача: ', tempDoc^.Doc.specialisation);
+              writeln(F, 'Кабинет врача: ', tempDoc^.Doc.cab);
+              writeln(F, '----------------------------------------');
+            end;
             Time := Time + StrToTime('00:20');
           end;
         end;
@@ -1217,7 +1228,7 @@ begin
           setLength(tempArr, length(tempArr) + 1);
           tempArr[High(tempArr)] := TalonArr[i];
           inc(count);
-          writeln(count);
+          writeln(count, ')');
           printTalon(TalonArr[j]^.Talon);
         end;
       end;
@@ -1232,6 +1243,19 @@ begin
     Dec(chose);
     write('Введите ваше ФИО: ');
     readln(tempArr[chose]^.Talon.patientLastName);
+    DocArr := SearchDoc(DocList, searchCompDocKey, tempArr[chose]^.Talon.docKey);
+    rewrite(F);
+    with tempArr[chose]^.Talon do
+    begin
+      writeln(F, 'Дата: ', DateToStr(date));
+      writeln(F, 'Время: ', TimeToStr(time));
+      writeln(F, 'ФИО пациента: ', patientLastName);
+      writeln(F, 'ФИО врача: ', DocArr[0]^.Doc.docLastName);
+      writeln(F, 'Специализация врача: ', DocArr[0]^.Doc.specialisation);
+      writeln(F, 'Кабинет врача: ', DocArr[0]^.Doc.cab);
+      writeln(F, '----------------------------------------');
+
+    end;
     DocDate.code := tempArr[chose]^.Talon.docKey;
     DocDate.date := Date;
     TalonArr := searchTalon(TalonList, searchCompTalonDocDate, DocDate);
@@ -1276,15 +1300,17 @@ begin
   end;
 end;
 
-procedure ReadFiles(var FTalon: TTalonFile; var FDoc: TDocFile; TalonList: TTalonListPt; DocList: TDocListPt);
+procedure ReadFiles(var FTalon: TTalonFile; var FDoc: TDocFile; TalonList: TTalonListPt; DocList: TDocListPt; var MaxKey: integer);
 var
   Talon: TTalon;
   Doc: TDoc;
+
 begin
   Reset(FTalon);
   Reset(FDoc);
   ClearTalons(TalonList);  
   ClearDocs(DocList);
+  maxKey := 0;
   while not EoF(FTalon) do
   begin
     read(FTalon, Talon);
@@ -1294,6 +1320,8 @@ begin
   begin
     read(FDoc, Doc);
     AddDoc(DocList, doc);
+    if maxKey < Doc.docKey then
+      maxKey := Doc.docKey;
   end;
 end;
 
@@ -1352,6 +1380,7 @@ var
   MaxKey: Integer;
   FDoc: TDocFile;
   FTalon: TTalonFile;
+  FSpec: Text;
 
 begin
   New(TalonList);
@@ -1363,13 +1392,14 @@ begin
   MaxKey := 0;
   Assign(FTalon, 'Talons.dat');
   Assign(FDoc, 'Docss.dat');
+  Assign(FSpec, 'Spec.txt');
   while isOn do
   begin
     MainMenu;
     InputMenu(10, temp);
     case temp of
     1:
-      ReadFiles(FTalon, FDoc, TalonList, DocList);
+      ReadFiles(FTalon, FDoc, TalonList, DocList, MaxKey);
     2:
       LookList(TalonList, DocList);
     3:
@@ -1383,7 +1413,7 @@ begin
     7:
       ChangeList(TalonList, DocList);
     8:
-      SpecialFunctions(TalonList, DocList);
+      SpecialFunctions(FSpec, TalonList, DocList);
     9:
       isOn := false;
     10:

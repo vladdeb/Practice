@@ -59,10 +59,6 @@ type
     name: string;
     Date: TDate;
   end;
-  TSpecDate = record
-    spec: string;
-    Date: TDate;
-  end;
 
 const
   WeekNames: array[TWeekDay] of String = ('Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье');
@@ -939,7 +935,7 @@ begin
     size := TalonListSize(TalonList);
     if size > 0 then
     begin
-      write('Введите номер записи для удаления');
+      write('Введите номер записи для удаления: ');
       InputMenu(size, chose);
       DeleteTalon(TalonList, DocList, chose);
     end;
@@ -951,7 +947,7 @@ begin
     size := DocListSize(DocList);
     if size > 0 then
     begin
-      write('Введите номер записи для удаления');
+      write('Введите номер записи для удаления: ');
       InputMenu(size, chose);
       DeleteDoc(DocList, TalonList, chose);
     end;
@@ -1229,6 +1225,7 @@ begin
     if count = 0 then
     begin
       writeln('Свободных талонов не найдено');
+      Exit;
     end;
     write('Выберите номер талона: ');
     InputMenu(count, chose);
