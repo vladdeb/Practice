@@ -855,6 +855,7 @@ var
   Doc: TDoc;
   Schedule: TSchedule;
   flag: boolean;
+  cab: integer;
 
 begin
   chooseListMenu;
@@ -890,13 +891,13 @@ begin
     writeln('¬ведите ‘»ќ врача: ');
     readln(Name);
     writeln('¬ведите кабинет врача: ');
-    InputMenu(999, chose);
+    InputMenu(999, cab);
     writeln('¬ведите расписание: ');
     for var i := Mon to Sat do
     begin
       writeln(WeekNames[i], ': ');
       writeln('¬рач работает в этот день(1 если да, 2 если нет):');
-      InputMenu(2, Chose);
+      InputMenu(2, chose);
       if chose = 2 then
       begin
         Schedule[i].start := StrToTime('09:00');
@@ -917,7 +918,7 @@ begin
         until flag;
       end;
     end;
-    Doc := MakeDoc(MaxKey, specialisation, Name, chose, Schedule);
+    Doc := MakeDoc(MaxKey, specialisation, Name, cab, Schedule);
     AddDoc(DocList, Doc);
   end;
   end;
